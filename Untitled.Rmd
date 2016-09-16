@@ -1,0 +1,67 @@
+---
+title: 'Hoxell-enabled Personalization: Berna Hotel'
+author: "Gabriele Piccoli"
+output:
+    pdf_document:
+        includes:
+            in_header: header.tex
+---
+```{r global_options, include=FALSE}
+knitr::opts_chunk$set(collapse=TRUE, warning=TRUE, message=FALSE, echo = TRUE, results='hide')
+```
+
+#Introduction
+This is the current report for the persalization study of *HGRM* use at the *Berna Hotel*. 
+The report was generated on `r format(Sys.time(), "%d %B, %Y")`.
+
+```{r echo=FALSE}
+fileH1i <- "H1individual.csv"
+fileH1a <- "H1aggregate.csv"
+fileCompl <- "BernaComplete_2011_20150630.csv"
+fileRep <- "BernaRepeatedPair_2011_20150630_BothChannels.csv"
+fileDisinterm <- "BernaAllReservation_2011_20150630.csv"
+fileRepMult <- "BernaAllRez_2011_20150630.csv"
+
+individual <- read.csv(fileH1i)
+date_range <- with(individual, range(as.Date(Date)))
+
+Levels <- levels(individual$Date)
+
+## OLD CODE FOR MANIPULATING DATES
+# ind <- grep("^20", Levels)
+# Levels[ind] <- sapply(strsplit(Levels[ind], "/"), function(x) paste(x[c(2, 3, 1)], collapse = "/"))
+# levels(individual$Date) <- Levels
+# individual$Month <- format(strptime(individual$Date, "%m/%d/%Y"), "%Y-%m")
+##
+
+individual$Month <- format(strptime(individual$Date, "%Y-%m-%d"), "%Y-%m")
+
+## Hypothesis 1
+aggregate <- read.csv(fileH1a)
+X <- data.frame(Month = rep(aggregate$Month, 2),
+                Stays = rep(aggregate$Stays, 2),
+                Persons = c(aggregate$phPers, aggregate$vPers),
+                count = c(aggregate$countPhPers, aggregate$countVPers),
+                virtualization = !is.na(aggregate$vPers),
+                method = rep(c("physical", "virtual"), each = nrow(aggregate)))
+X <- na.omit(X)
+```
+
+#Basic statistics
+The dataset includes **`r nrow(individual)`** reservations for **`r sum(aggregate$Stays)`** hotel stays during the **`r format(date_range[1], "%d %B, %Y")`** to **`r format(date_range[2], "%d %B, %Y")`** timeframe. Of these, **`r sum(table(individual$Method)[c("physical", "virtual")])`** are personalized either physically or through myPage.
+  
+##Personalization Request via Traditional Channel and myPage
+```{r echo=FALSE, results='hold'}
+## Table 2
+tab2 <- with(aggregate, rbind(Stays = c(mean = mean(Stays), sd = sd(Stays), min = min(Stays), max = max(Stays)),
+              t(sapply(c("physical", "virtual"), function(method) {
+                  x <- table(factor(subset(individual, Method == method, Month)$Month))
+                  c(mean = mean(x), sd = sd(x), min = min(x), max = max(x))
+              })),
+              do.call("rbind", with(subset(individual, Method %in% c("virtual", "physical")),
+                                    tapply(P_ItemCount, factor(Method), function(x)
+                                           c(mean = mean(x), sd = sd(x), min = min(x), max = max(x)))))))
+tab2[,1:2] <- round(tab2[,1:2], digits = 2)
+knitr::kable(tab2, digits = 2)
+```
+
